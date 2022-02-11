@@ -6,8 +6,7 @@ Mediumautopost is a CLI tool (and a Go package) that will automatically post you
 
 ## How to Install
 
-`brew tap askcloudarchitech/askcloudarchitech`
-`brew install mediumautopost`  
+`brew tap askcloudarchitech/askcloudarchitech && brew install mediumautopost`  
 Or download binary from the releases tab.  
 Or use as a package with `package github.com/askcloudarchitech/mediumautopost/pkg/mediumautopost`
 
@@ -35,7 +34,7 @@ GITHUB_STATUS_REPO="repo name for storing status of posts to medium.com"
 
 Next, run the command and you are all set. 
 
-`mediumautpost -e /path/to/your/.env` and watch the magic happen!
+`mediumautopost -e /path/to/your/.env` and watch the magic happen!
 
 ## Contributing
 
