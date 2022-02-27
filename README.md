@@ -35,7 +35,7 @@ GITHUB_PERSONAL_TOKEN="generate a personal access token and paste here"
 GITHUB_STATUS_REPO_OWNER="your Github account name"
 GITHUB_STATUS_REPO="repo name for storing status of posts to medium.com"
 STORAGE_TYPE=""
-STORAGE_FILE_PATH="/Users/garymorse/projects/askcloudarch-org/mediumAutoPost/status.json"
+STORAGE_FILE_PATH="/OPTIONAL/PATH/TO/STATUS/FILE.json"
 ```
 
 Next, run the command and you are all set. 
