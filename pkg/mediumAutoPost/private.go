@@ -20,6 +20,8 @@ import (
 // updateStatusRepository takes the updated array of published articles and commits it back to github so its up to date for the next time this runs.
 // I'm not gonna lie, this is a bit complicated. the process is outlined here: http://www.levibotelho.com/development/commit-a-file-with-the-github-api/
 // This code does those steps using go-github.
+// if STORAGE_TYPE is "file" and STORAGE_FILE_PATH is set, a local file will be used for storing the publish status.
+// otherwise github will be used to store the publish status
 func updateStatusRepository(PublishedArticles []PublishedArticle, c Config) error {
 	log.Println("updating status of posted articles for next use.")
 	filebytes, err := json.MarshalIndent(PublishedArticles, "", "  ")
@@ -28,70 +30,77 @@ func updateStatusRepository(PublishedArticles []PublishedArticle, c Config) erro
 		return err
 	}
 
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: c.GithubPersonalToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
+	if c.StorageType == File && len(c.StorageFile) > 0 {
+		err := ioutil.WriteFile(c.StorageFile, filebytes, 0644)
+		if err != nil {
+			return err
+		}
+	} else {
+		ctx := context.Background()
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: c.GithubPersonalToken},
+		)
+		tc := oauth2.NewClient(ctx, ts)
+		client := github.NewClient(tc)
 
-	log.Println("fetching main branch")
-	branch, _, err := client.Repositories.GetBranch(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, "main")
-	if err != nil {
-		return err
-	}
+		log.Println("fetching main branch")
+		branch, _, err := client.Repositories.GetBranch(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, "main")
+		if err != nil {
+			return err
+		}
 
-	log.Println("creating blob")
-	blob, _, err := client.Git.CreateBlob(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, &github.Blob{
-		Content: &filebytesSting,
-	})
-	if err != nil {
-		return err
-	}
+		log.Println("creating blob")
+		blob, _, err := client.Git.CreateBlob(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, &github.Blob{
+			Content: &filebytesSting,
+		})
+		if err != nil {
+			return err
+		}
 
-	path := "status.json"
-	mode := "100644"
-	treetype := "blob"
+		path := "status.json"
+		mode := "100644"
+		treetype := "blob"
 
-	log.Println("creating tree")
-	tree, _, err := client.Git.CreateTree(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, *branch.Commit.Commit.Tree.SHA, []github.TreeEntry{
-		{
-			Path: &path,
-			Mode: &mode,
-			Type: &treetype,
-			SHA:  blob.SHA,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	log.Println("creating commit")
-	message := "update the medium content"
-	newCommit, _, err := client.Git.CreateCommit(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, &github.Commit{
-		Parents: []github.Commit{
+		log.Println("creating tree")
+		tree, _, err := client.Git.CreateTree(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, *branch.Commit.Commit.Tree.SHA, []github.TreeEntry{
 			{
-				SHA: branch.Commit.SHA,
+				Path: &path,
+				Mode: &mode,
+				Type: &treetype,
+				SHA:  blob.SHA,
 			},
-		},
-		Tree:    tree,
-		Message: &message,
-	})
-	if err != nil {
-		return err
-	}
+		})
+		if err != nil {
+			return err
+		}
 
-	log.Println("updating ref")
-	branchref := "refs/heads/main"
-	reference := github.Reference{
-		Object: &github.GitObject{
-			SHA: newCommit.SHA,
-		},
-		Ref: &branchref,
-	}
-	_, _, err = client.Git.UpdateRef(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, &reference, false)
-	if err != nil {
-		return err
+		log.Println("creating commit")
+		message := "update the medium content"
+		newCommit, _, err := client.Git.CreateCommit(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, &github.Commit{
+			Parents: []github.Commit{
+				{
+					SHA: branch.Commit.SHA,
+				},
+			},
+			Tree:    tree,
+			Message: &message,
+		})
+		if err != nil {
+			return err
+		}
+
+		log.Println("updating ref")
+		branchref := "refs/heads/main"
+		reference := github.Reference{
+			Object: &github.GitObject{
+				SHA: newCommit.SHA,
+			},
+			Ref: &branchref,
+		}
+		_, _, err = client.Git.UpdateRef(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, &reference, false)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -193,33 +202,45 @@ func fetchArticleIndexFromSite(c Config, client http.Client) ([]ArticleIndexItem
 	return indexOfArticlesOnWebsite, nil
 }
 
-// fetchPublishedArticles fetches a json file from the github repo which stores the status of which articles
+// fetchPublishedArticles fetches a json file from the github repo or from file which stores the status of which articles
 // have been already published to medium.com
+// if STORAGE_TYPE is "file" and STORAGE_FILE_PATH is set, a local file will be used for storing the publish status.
+// otherwise github will be used to store the publish status
 func fetchPublishedArticles(c Config) ([]PublishedArticle, error) {
 	publishedArticles := []PublishedArticle{}
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: c.GithubPersonalToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
+	var filedata []byte
+	var err error
+	if c.StorageType == File && len(c.StorageFile) > 0 {
+		log.Println("FILE storage type detected. Using local file for status storage")
+		filedata, err = ioutil.ReadFile(c.StorageFile)
+		if err != nil {
+			return publishedArticles, err
+		}
+	} else {
+		ctx := context.Background()
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: c.GithubPersonalToken},
+		)
+		tc := oauth2.NewClient(ctx, ts)
 
-	client := github.NewClient(tc)
-	gitoptions := github.RepositoryContentGetOptions{
-		Ref: "main",
-	}
-	log.Println("Pulling list of already published articles")
-	rc, err := client.Repositories.DownloadContents(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, "status.json", &gitoptions)
-	if err != nil && strings.Contains(err.Error(), "No file named") {
-		log.Println("no status.json file found. starting from scratch")
-		return publishedArticles, nil
-	}
-	if err != nil {
-		return publishedArticles, err
-	}
-	defer rc.Close()
-	filedata, err := ioutil.ReadAll(rc)
-	if err != nil {
-		return publishedArticles, err
+		client := github.NewClient(tc)
+		gitoptions := github.RepositoryContentGetOptions{
+			Ref: "main",
+		}
+		log.Println("Pulling list of already published articles")
+		rc, err := client.Repositories.DownloadContents(ctx, c.GithubStatusRepoOwner, c.GithubStatusRepo, "status.json", &gitoptions)
+		if err != nil && strings.Contains(err.Error(), "No file named") {
+			log.Println("no status.json file found. starting from scratch")
+			return publishedArticles, nil
+		}
+		if err != nil {
+			return publishedArticles, err
+		}
+		defer rc.Close()
+		filedata, err = ioutil.ReadAll(rc)
+		if err != nil {
+			return publishedArticles, err
+		}
 	}
 
 	log.Println("unmarshaling status.json")
@@ -250,9 +271,17 @@ func getconfig(filename string) (Config, error) {
 		GithubPersonalToken:   os.Getenv("GITHUB_PERSONAL_TOKEN"),
 		GithubStatusRepoOwner: os.Getenv("GITHUB_STATUS_REPO_OWNER"),
 		GithubStatusRepo:      os.Getenv("GITHUB_STATUS_REPO"),
+		StorageFile:           os.Getenv("STORAGE_FILE_PATH"),
 	}
 	if config.MediumEndpointPrefix == "" {
 		config.MediumEndpointPrefix = "https://api.medium.com/v1"
 	}
+	switch os.Getenv("STORAGE_TYPE") {
+	case "FILE":
+		config.StorageType = File
+	default:
+		config.StorageType = Github
+	}
+
 	return config, nil
 }

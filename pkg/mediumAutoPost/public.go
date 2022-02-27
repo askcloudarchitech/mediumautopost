@@ -11,6 +11,8 @@ import (
 
 // Config is configuration found in .env
 type Config struct {
+	StorageType           StorageType
+	StorageFile           string
 	MediumEndpointPrefix  string
 	MediumBearerToken     string
 	WebsiteJSONIndexURL   string
@@ -19,6 +21,13 @@ type Config struct {
 	GithubStatusRepo      string
 	MediumUser            *medium.User
 }
+
+type StorageType int
+
+const (
+	File StorageType = iota
+	Github
+)
 
 // PublishedArticle is a record of how and when an article was published to medium.com.
 // Can be seen here: https://github.com/askcloudarchitech/medium-publish-status

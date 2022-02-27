@@ -19,6 +19,10 @@ To use this tool you will need to set up a few things:
 3. get your medium.com API key
 4. set up your website so it can tell mediumautopost about its articles. To see how to do this, read this article on my website: https://askcloudarchitech.com/posts/tutorials/auto-generate-post-payload-medium-com/ or on medium.com at: https://blog.devgenius.io/auto-generate-a-medium-com-rest-api-payload-to-syndicate-posts-with-hugo-fce630cced67
 
+### Alternative file storage
+
+If you dont want the post status stored in a github repo, you can configure the tool to store the status in a local file. To do this, leave the GITHUB env vars empty and instead set the STORAGE_TYPE to "FILE" and STORAGE_FILE_PATH in the .env and this program will use a local file instead.
+
 ## Running the tool
 
 After you have your website set up as mentioned above and you have the required tokens an such, create a .env file in the following format:
@@ -30,6 +34,8 @@ WEBSITE_JSON_INDEX_URL="path to your JSON index file"
 GITHUB_PERSONAL_TOKEN="generate a personal access token and paste here"
 GITHUB_STATUS_REPO_OWNER="your Github account name"
 GITHUB_STATUS_REPO="repo name for storing status of posts to medium.com"
+STORAGE_TYPE=""
+STORAGE_FILE_PATH="/Users/garymorse/projects/askcloudarch-org/mediumAutoPost/status.json"
 ```
 
 Next, run the command and you are all set. 
