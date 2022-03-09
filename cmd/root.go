@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	mediumautopost "github.com/askcloudarchitech/medium-auto-post/pkg/mediumAutoPost"
+	mediumautopost "github.com/askcloudarchitech/mediumautopost/pkg/mediumAutoPost"
 	"github.com/spf13/cobra"
 )
 

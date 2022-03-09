@@ -1,4 +1,4 @@
-module github.com/askcloudarchitech/medium-auto-post
+module github.com/askcloudarchitech/mediumautopost
 
 go 1.17
 

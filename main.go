@@ -1,6 +1,6 @@
 package main
 
-import "github.com/askcloudarchitech/medium-auto-post/cmd"
+import "github.com/askcloudarchitech/mediumautopost/cmd"
 
 func main() {
 	cmd.Execute()
